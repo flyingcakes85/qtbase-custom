@@ -37,11 +37,16 @@
 **
 ****************************************************************************/
 
+#include <qdebug.h>
+
+
 #include "qgenericunixservices_p.h"
 #include <QtGui/private/qtguiglobal_p.h>
 
 #include <QtCore/QDebug>
+#include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #if QT_CONFIG(process)
 # include <QtCore/QProcess>
 #endif
@@ -228,6 +233,46 @@ static inline QDBusMessage xdgDesktopPortalOpenFile(const QUrl &url)
     return QDBusMessage::createError(QDBusError::InternalError, qt_error_string());
 }
 
+static inline QDBusMessage xdgDesktopPortalOpenDirectory(const QUrl &url)
+{
+    // DBus signature:
+    // OpenDirectory (IN  s     parent_window,
+    //                IN  h     fd,
+    //                IN  a{sv} options,
+    //                OUT o     handle);
+
+
+#ifdef O_PATH
+    const int fd = qt_safe_open(QFile::encodeName(url.toLocalFile()), O_PATH);
+    if (fd != -1) {
+        QDBusMessage message = QDBusMessage::createMethodCall(QLatin1String("org.freedesktop.portal.Desktop"),
+                                                              QLatin1String("/org/freedesktop/portal/desktop"),
+                                                              QLatin1String("org.freedesktop.portal.OpenURI"),
+                                                              QLatin1String("OpenDirectory"));
+
+        QDBusUnixFileDescriptor descriptor;
+        descriptor.giveFileDescriptor(fd);
+
+        const QVariantMap options = {{QLatin1String("writable"), true}};
+
+        // FIXME parent_window_id
+        message << QString() << QVariant::fromValue(descriptor) << options;
+\
+        qInfo() << "--- start opendirectory method call ---\n"
+                << message
+                << "--- end opendirectory method call ---";
+
+        QDBusMessage return_msg = QDBusConnection::sessionBus().call(message);
+        qInfo() << "Return message : " << return_msg;
+        return return_msg;
+    }
+#else
+    Q_UNUSED(url);
+#endif
+
+    return QDBusMessage::createError(QDBusError::InternalError, qt_error_string());
+}
+
 static inline QDBusMessage xdgDesktopPortalOpenUrl(const QUrl &url)
 {
     // DBus signature:
@@ -338,6 +383,14 @@ bool QGenericUnixServices::openDocument(const QUrl &url)
 {
 #if QT_CONFIG(dbus)
     if (checkNeedPortalSupport()) {
+
+    if ( QFileInfo( QFile( url.toLocalFile() ) ).isDir() ) {
+            qInfo() << "Opening folder";
+            QDBusError error = xdgDesktopPortalOpenDirectory(url);
+            if ( !error.isValid() )
+                return true;
+    }
+
         QDBusError error = xdgDesktopPortalOpenFile(url);
         if (isPortalReturnPermanent(error))
             return !error.isValid();
