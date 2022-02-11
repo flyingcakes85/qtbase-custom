@@ -257,7 +257,6 @@ static inline QDBusMessage xdgDesktopPortalOpenDirectory(const QUrl &url)
 
         // FIXME parent_window_id
         message << QString() << QVariant::fromValue(descriptor) << options;
-\
         qInfo() << "--- start opendirectory method call ---\n"
                 << message
                 << "\n--- end opendirectory method call ---";
