@@ -260,7 +260,7 @@ static inline QDBusMessage xdgDesktopPortalOpenDirectory(const QUrl &url)
 \
         qInfo() << "--- start opendirectory method call ---\n"
                 << message
-                << "--- end opendirectory method call ---";
+                << "\n--- end opendirectory method call ---";
 
         QDBusMessage return_msg = QDBusConnection::sessionBus().call(message);
         qInfo() << "Return message : " << return_msg;
